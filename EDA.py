@@ -484,3 +484,129 @@ print("Classification Report:\n", classification_report(y_test, y_pred))
 
 
 # %%
+# %%
+
+# Predict how much loan amount an applicant will be approved
+
+# Understanding the Loan_Period and loan amount 
+
+df["Loan_Period"].value_counts()
+plt.pie(df["Loan_Period"].value_counts().values,labels=df["Loan_Period"].value_counts().index,autopct="%1.1f%%")
+plt.axis("equal")
+plt.title("Loan_Period")
+plt.show() 
+# %%
+sns.barplot(x="Loan_Period",y="Loan_Amount",hue = 'Approved',data=df)
+plt.show() 
+
+# Loan_Period 4 and 5 are two category years of having the higher Loan_Amount in the group of being approved
+# %%
+
+# Understanding the Gender and Loan_Amount
+sns.barplot(x="Gender",y="Loan_Amount",hue = 'Approved',data=df)
+plt.show() 
+
+# Female is likely to get higher Loan_Amount compared with Male
+# %%
+
+# Understanding the Age_group and Loan_Amount
+sns.barplot(x="age_group",y="Loan_Amount",hue = 'Approved',data=df)
+plt.show() 
+
+# 40-50 Age group is likely to get higher Loan_Amount
+# %%
+
+# Run a ANOVA test to evaluate whether different Loan_Period categories in the group of approval have diiferent Loan_Amount 
+
+import scipy.stats as stats
+
+df_approved = df[df['Approved'] == '1']
+
+# create a dictionary to store the 'Loan_Amount' values for each 'Loan_Period' category
+loan_period_dict = {}
+for period in df_approved['Loan_Period'].unique():
+    loan_period_dict[period] = df_approved[df_approved['Loan_Period'] == period]['Loan_Amount']
+
+# perform ANOVA test
+f, p = stats.f_oneway(*loan_period_dict.values())
+print('F-statistic:', f)
+print('p-value:', p)
+
+# The ANOVA test result shows an F-statistic of 17.36 and a very low p-value of 5.42e-13. 
+# This suggests that there is a significant difference in the mean 'Loan_Amount' between at least two 'Loan_Period' categories in the group of approved loans. 
+# %%
+
+# Perform  post-hoc tests (such as Tukey's HSD test) to determine which pairs of 'Loan_Period' categories have significantly different mean 'Loan_Amount' values.
+import statsmodels.stats.multicomp as mc
+
+# perform Tukey's HSD post-hoc test
+tukey_results = mc.MultiComparison(df_approved['Loan_Amount'], df_approved['Loan_Period']).tukeyhsd()
+print(tukey_results)
+
+# Group 1.0 is different with Group 3, 4, 5
+# Group 2 is different with Group 4 ,5
+# Group 3 is different with Group 5
+# %%
+
+#  Run a  T-test to evaluate whether different Gender categories in the group of approval have diiferent Loan_Amount 
+
+from scipy.stats import ttest_ind
+
+# separate approved loans by gender
+df_approved_male = df_approved[df_approved['Gender']=='Male']
+df_approved_female = df_approved[df_approved['Gender']=='Female']
+
+# perform independent t-test
+t, p = ttest_ind(df_approved_male['Loan_Amount'], df_approved_female['Loan_Amount'], equal_var=False)
+print(f"T-statistic: {t:.2f}")
+print(f"P-value: {p:.2f}")
+
+# If the t-statistic returned by the independent t-test is negative and the p-value is greater than the significance level (e.g., 0.05), 
+# it suggests that there is no significant difference in the mean 'Loan_Amount' between the two 'Gender' categories. In other words, there is no evidence to suggest that 'Gender' is a significant predictor of 'Loan_Amount' in this dataset.
+
+
+# %%
+# check the correlation plot in df
+plt.figure(figsize=[10,8])
+plt.title('Correlation Heatmap of Bank Loan Dataset')
+sns.heatmap(df.corr(),annot=True,cmap="coolwarm")
+
+
+# %%
+# check the correlation plot in df_approved
+plt.figure(figsize=[10,8])
+plt.title('Correlation Heatmap of Approval Dataset')
+sns.heatmap(df_approved.corr(),annot=True,cmap="coolwarm")
+
+# %%
+# df_approved = df[df['Approved'] == '1']
+# Predict how much Loan_amount an applicant will be approved
+# Independet variable: Loan_Period(Categorical), Monthly_income, Interest_Rate,Age
+# dependent vaiable: Loan_Amount
+
+Loan_Period_dummies = pd.get_dummies(df_approved['Loan_Period'], prefix='Loan_Period')
+
+# Define the independent variables
+X = pd.concat([df_approved[['Monthly_Income', 'Interest_Rate', 'age']], Loan_Period_dummies], axis=1)
+
+# Define the dependent variable
+y = df_approved['Loan_Amount']
+
+# Add a constant to the independent variables
+X = sm.add_constant(X)
+
+# Fit the multiple linear regression model
+model = sm.OLS(y, X).fit()
+
+# Print the model summary
+print(model.summary())
+
+#%%
+
+from sklearn.model_selection import cross_val_score
+# perform 5-fold cross-validation
+scores = cross_val_score(model , X, y, cv=5)
+
+# print the cross-validation scores
+print("Cross-validation scores:", scores)
+print("Mean cross-validation score:", np.mean(scores))
