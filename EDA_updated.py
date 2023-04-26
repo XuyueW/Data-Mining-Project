@@ -29,8 +29,7 @@ from sklearn.model_selection import cross_val_score
 # %%
 df = pd.read_csv('train.csv')
 df.head()
-# drop ID
-df = df.drop('ID', axis=1)
+df.info()
 print("Shape of dataset:", df.shape)
 print("Data types:\n", df.dtypes)
 # check missing data
@@ -38,29 +37,39 @@ print("Number of missing values:\n", df.isna().sum())
 # for small number of missing data, we can try fill it or drop those observations.
 # for large number of categorical missing data, we can consider grouping the categories with missing values into a new category.
 # for large number of numeric missing data, we might try to delete that variable.
-# convert Employer_Category2 into categorical
-df['Employer_Category2'] = df['Employer_Category2'].astype(str)
-# convert Var1 (Var1: Anonymized Categorical variable with multiple levels)
-df['Var1'] = df['Var1'].astype(str)
-# convert Approved (Whether a loan is Approved or not (1-0) . Customer is Qualified Lead or not (1-0))
-df['Approved'] = df['Approved'].astype(str)
-print("Data types:\n", df.dtypes)
-# EDA
+
+# Employer_Category2, Var1, Approved are supposed to be categorical
+
 # numeric variable summary
 print(df.describe()) #Descriptive Statistics
 print(df.corr()) #Correlation Analysis
-sns.countplot(x='Approved', data=df) # Target variable distribution
+print(df['Approved'].value_counts()) # Imbalance Target variable 
 # df['Employer_Code'].unique()
 # df['Customer_Existing_Primary_Bank_Code'].unique()
 # df['Employer_Code'].unique()
 
+
 #%%
-# DATA CLEANING
+# DATA CLEANING and some EDA
 # missing value and convert data
 
 df = df.drop_duplicates() # Remove duplicates
-df = df.dropna() # Remove missing values
-df = df[(df['Monthly_Income'] >= 1500) & (df['Monthly_Income'] <= 25000)] # Handle outliers
+# drop ID after check duplicates 
+df = df.drop('ID', axis=1)
+
+df = df[(df['Monthly_Income'] >= 1500) & (df['Monthly_Income'] <= 15000)] 
+# Handle outliers and display
+plt.hist(df['Monthly_Income'], bins=50)
+plt.xlabel('Monthly Income')
+plt.ylabel('Frequency')
+plt.title('Histogram of Monthly Income')
+plt.show()
+# By Approved Rate
+df.groupby(['Monthly_Income'])['Approved'].mean().plot()
+plt.title('Mean Approval Rate by Monthly Income')
+plt.show()
+# The approval rate is not monotonely increasing
+
 # for 15 missing value in DOB, we can just drop those observations
 df = df.dropna(subset=['DOB'])
 # convert DOB to age in years
@@ -73,7 +82,12 @@ df = df.drop('DOB', axis=1)
 # We find age have unreal data including birth in the future, drop them
 print(f"Number of positive values: {(df['age'] >= 0).sum()}")
 print(f"Number of negative values: {(df['age'] < 0).sum()}")
-df = df[df['age'] >= 0] 
+df = df[df['age'] >= 16] # age lower than 16 is also considered unreal
+plt.hist(df['age'], bins=50)
+plt.xlabel('Age')
+plt.ylabel('Frequency')
+plt.title('Histogram of Age')
+plt.show()
 
 # also convert and check Lead_Creation_Date 
 df['lead_years'] = now.year - pd.to_datetime(df['Lead_Creation_Date'], format='%y/%m/%d').dt.year
@@ -90,10 +104,11 @@ most_frequent = df['City_Code'].mode()[0]
 num_occurrences = (df['City_Code'] == most_frequent).sum()
 print(f"The most frequent category in City_Code is {most_frequent}")
 print(f"It occurs {num_occurrences} times")
-# it is not a good idea to fill with mode as number of mode is large
-# drop missing values
-df = df.dropna(subset=['City_Code'])
-# missing value in City_Category was dropped simultaneously 
+# City_Code might be redundant
+print( pd.crosstab(df['City_Code'], df['City_Category']))
+print(df['City_Category'].value_counts())
+# all City_Code are assigned to City_Category, drop City_Code
+df = df.drop('City_Code', axis=1)
 
 # Find the most frequent category in Employer_Code 
 most_frequent = df['Employer_Code'].mode()[0]
@@ -102,47 +117,123 @@ print(f"The most frequent category in Employer_Code is {most_frequent}")
 print(f"It occurs {num_occurrences} times")
 # if we fill missing value with mode, the distribution will change, better to drop them 
 # df['Employer_Code'] = df['Employer_Code'].fillna(most_frequent)
-df = df.dropna(subset=['Employer_Code'])
-# # missing value in Employer_Category1 was dropped simultaneously 
+# contingency table
+print(pd.crosstab(df['Employer_Code'], df['Employer_Category1']))
+print(df['Employer_Category1'].value_counts())
+print(pd.crosstab(df['Employer_Code'], df['Employer_Category2']))
+print(df['Employer_Category2'].value_counts())
+# all Employer_Code are assigned to either category, drop Employer_Code
+df = df.drop('Employer_Code', axis=1)
+# # missing value in Employer_Category1 was dropped simultaneously
+# contingency table for Employer_Category1 and Employer_Category2
+print(pd.crosstab(df['Employer_Category1'], df['Employer_Category2']))
+# convert Employer_Category2 to categorical
+df['Employer_Category2'] = df['Employer_Category2'].map({1.0: 'one', 2.0: 'two',3.0:'three',4.0:'four'})
 
 # Find the most frequent category in Customer_Existing_Primary_Bank_Code
 most_frequent = df['Customer_Existing_Primary_Bank_Code'].mode()[0]
 num_occurrences = (df['Customer_Existing_Primary_Bank_Code'] == most_frequent).sum()
 print(f"The most frequent category in Customer_Existing_Primary_Bank_Code is {most_frequent}")
 print(f"It occurs {num_occurrences} times")
-# drop missing values
-df = df.dropna(subset=['Customer_Existing_Primary_Bank_Code'])
-# missing value in Primary_Bank_Type was dropped simultaneously 
+print(pd.crosstab(df['Customer_Existing_Primary_Bank_Code'], df['Primary_Bank_Type']))
+print(df['Primary_Bank_Type'].value_counts())
+# all Customer Code are assigned to a binary Bank Type, drop customer Code
+df = df.drop('Customer_Existing_Primary_Bank_Code', axis=1)
 
 # Find the most frequent category in Loan_Amount
 most_frequent = df['Loan_Amount'].mode()[0]
 num_occurrences = (df['Loan_Amount'] == most_frequent).sum()
 print(f"The most frequent category in Loan_Amount is {most_frequent}")
 print(f"It occurs {num_occurrences} times")
-# drop missing values
-df = df.dropna(subset=['Loan_Amount'])
-# missing value in Loan_Period was dropped simultaneously
+# Handle outliers and display
+df = df[df['Loan_Amount'] <= 150000] 
+plt.hist(df['Loan_Amount'], bins=50)
+plt.xlabel('Loan Amount')
+plt.ylabel('Frequency')
+plt.title('Histogram of Loan Amount')
+plt.show()
+df.groupby(['Loan_Amount'])['Approved'].mean().plot()
+plt.title('Mean Approval Rate by Loan_Amount')
+plt.show()
+# There is a trend of increasing in approval rate
 
 # Find the most frequent category in Interest_Rate 
 most_frequent = df['Interest_Rate'].mode()[0]
 num_occurrences = (df['Interest_Rate'] == most_frequent).sum()
 print(f"The most frequent category in Interest_Rate is {most_frequent}")
 print(f"It occurs {num_occurrences} times")
+# Handle outliers and display
+df.Interest_Rate.describe()
+plt.hist(df['Interest_Rate'], bins=50)
+plt.xlabel('Interest Rate')
+plt.ylabel('Frequency')
+plt.title('Histogram of Interest Rate')
+plt.show()
+df.groupby(['Interest_Rate'])['Approved'].mean().plot()
+plt.title('Mean Approval Rate by Interest Rate')
+plt.show()
+# Approval rate drop when reach about 20% (high risk applicant)
+
 # drop missing values
 df = df.dropna(subset=['Interest_Rate'])
 # missing value in EMI was dropped simultaneously
 
-# Contacted only left Y,drop it
+# Also Handle outliers and display for EMI
+df.EMI.describe()
+df = df[df['EMI'] <= 3000] 
+plt.hist(df['EMI'], bins=50)
+plt.xlabel('EMI')
+plt.ylabel('Frequency')
+plt.title('Histogram of EMI')
+plt.show()
+# EMI distribution is approximately normal after cut off right tail
+df.groupby(['EMI'])['Approved'].mean().plot()
+plt.title('Mean Approval Rate by EMI')
+plt.show()
+# no obivious trend
+
+# Equation of EMI(equated monthly installment) 
+# EMI = P x R x (1+R)^N / [(1+R)^N-1]
+# P: Principal loan amount (Loan_Amount)
+# N: Loan tenure in months (Loan_Period)
+# R: Interest rate per month (Interest_Rate)
+# this indicate multicollinearity
+# can affect the stability and interpretability of the model
+
+# Check other variables, no missing value but might redundant
 print(f"Number of Contacted Verified: {(df['Contacted'] == 'Y').sum()}")
+# Contacted only left Y,drop it
 df = df.drop('Contacted', axis=1)
+
+# contingency table for Source
+print(pd.crosstab(df['Source'], df['Source_Category']))
+print(df['Source_Category'].value_counts())
+# all Source_Category are assigned, drop Source
+df = df.drop('Source', axis=1)
+
+# scatter plot for Existing_EMI and EMI
+plt.scatter(df['Existing_EMI'], df['EMI'])
+plt.xlabel('Existing_EMI')
+plt.ylabel('EMI')
+plt.title('Scatter Plot of Existing_EMI vs. EMI')
+plt.show()
+# better to keep both
+
+# contingency table for Var1
+print(pd.crosstab(df['Var1'], df['Approved']))
+print(df['Var1'].value_counts())
+# unknown but meaningful variable
 
 # check again if any missing value
 print("Number of missing values:\n", df.isna().sum())
+# drop missing values if any
+df = df.dropna()
 print("Shape of dataset:", df.shape)
-# Shape of dataset: (13525, 20)
+# Shape of dataset: (13033, 16)
 
 #%% 
-# Dimensional Reduction  
+# This part is dropped but keep code
+# Dimensional Reduction 
 # (City_Code , City_Category) 
 # (Employer_Code,Employer_Category1,Employer_Category2)
 # (Customer_Existing_Primary_Bank_Code,Primary_Bank_Type)
@@ -158,48 +249,14 @@ print(f"P-value: {p:.2f}")
 # Combine two highly correlated categorical variables using PCA
 
 # (City_Code , City_Category) 
-X = pd.get_dummies(df[['City_Code', 'City_Category']])
-pca = PCA(n_components=1)
-df['City_Combined'] = pca.fit_transform(X)
+# X = pd.get_dummies(df[['City_Code', 'City_Category']])
+# pca = PCA(n_components=1)
+# df['City_Combined'] = pca.fit_transform(X)
 # drop original variables
-df = df.drop(columns=['City_Code', 'City_Category'])
-
-# (Employer_Code,Employer_Category1,Employer_Category2)(will run for a few minute)
-X = pd.get_dummies(df[['Employer_Code','Employer_Category1','Employer_Category2']])
-pca = PCA(n_components=1)
-df['Employer_Combined'] = pca.fit_transform(X)
-# drop original variables
-df = df.drop(columns=['Employer_Code','Employer_Category1','Employer_Category2'])
-
-# (Customer_Existing_Primary_Bank_Code,Primary_Bank_Type)
-X = pd.get_dummies(df[['Customer_Existing_Primary_Bank_Code','Primary_Bank_Type']])
-pca = PCA(n_components=1)
-df['Bank_Type_Combined'] = pca.fit_transform(X)
-# drop original variables
-df = df.drop(columns=['Customer_Existing_Primary_Bank_Code','Primary_Bank_Type'])
-
-# check independence of (Source,Source_Category)
-observed = pd.crosstab(df['Source'], df['Source_Category'])
-chi2, p, dof, expected = chi2_contingency(observed)
-print(f"Chi-square statistic: {chi2:.2f}")
-print(f"P-value: {p:.2f}")
-
-# (Source,Source_Category)
-X = pd.get_dummies(df[['Source','Source_Category']])
-pca = PCA(n_components=1)
-df['Source_Combined'] = pca.fit_transform(X)
-# drop original variables
-df = df.drop(columns=['Source','Source_Category'])
+# df = df.drop(columns=['City_Code', 'City_Category'])
 
 # %%
-# bar plot of Approved
-plt.figure(figsize=(6,4))
-plt.bar(df['Approved'].unique(), df['Approved'].value_counts())
-plt.title('Distribution of Approved Status') 
-plt.xlabel('Approved Status')
-plt.ylabel('Count')
-plt.show()
-# extreme imbalance data (14060 vs 350), will affect the performance of machine learning
+# extreme imbalance data (12708 vs 325), will affect the performance of machine learning
 print(df['Approved'].value_counts())
 # Solution 1: train this dataset however may have a poor prediction performance on the minority class
 # Solution 2: Generate synthetic samples: You can use techniques like Synthetic Minority Over-sampling Technique (SMOTE) to generate synthetic samples of the minority class.
@@ -227,11 +284,14 @@ plt.show()
 # categorical_cols = df.iloc[:, [0, 7, 8]]
 # df_dummy = pd.get_dummies(df, columns=categorical_cols)
 
-# in case of confusion, create a copy of dataset 
+# create a copy of original dataset for resampling
 df_dummy = df.copy()
-df_dummy['Gender'] = df_dummy['Gender'].map({'Female': 0, 'Male': 1})
-df_dummy['Approved'] = df_dummy['Approved'].astype(int)
-df_dummy['Var1'] = df_dummy['Var1'].astype(int)
+df_dummy = pd.get_dummies(df,drop_first=True)
+df_dummy.head()
+
+#df_dummy['Gender'] = df_dummy['Gender'].map({'Female': 0, 'Male': 1})
+#df_dummy['Approved'] = df_dummy['Approved'].astype(int)
+#df_dummy['Var1'] = df_dummy['Var1'].astype(int)
 
 # Apply SMOTE to balance binary response variable
 smote = SMOTE()
@@ -243,13 +303,24 @@ X_resampled, y_resampled = smote.fit_resample(X, y)
 resampled_data = pd.concat([X_resampled, y_resampled], axis=1)
 resampled_data.head()
 print("Shape of balanced dataset:", resampled_data.shape)
-# Shape of balanced dataset: (26356, 15)
+# Shape of balanced dummy dataset: (25416, 23)
 # We have a balanced dataset for machine learning
 print(resampled_data['Approved'].value_counts())
 
+# Comparison display
+
+plt.scatter(df['age'], df['Monthly_Income'], c=df['Approved'], cmap='bwr',s=10, alpha=0.5)
+plt.xlabel('Age')
+plt.ylabel('Monthly_Income')
+plt.show()
+
+plt.scatter(resampled_data['age'], resampled_data['Monthly_Income'], c=resampled_data['Approved'], cmap='bwr',s=10, alpha=0.5)
+plt.xlabel('Age')
+plt.ylabel('Monthly_Income')
+plt.show()
 
 #%%
-# Visualization for feature selection
+# EDA and Visualization 
 
 # (We only need few of them in presenatation slides)
 
@@ -463,29 +534,39 @@ rmse_scores = np.sqrt(mse_scores)
 print("RMSE: %0.2f (+/- %0.2f)" % (np.mean(rmse_scores), np.std(rmse_scores) * 2))
 
 #%%
+# Logistic model
 # build a full model without feature selection
 # logistic regression for the whole dataframe (use original data)
 
-df['Gender'] = df['Gender'].map({'Female': 0, 'Male': 1})
-df['Approved'] = df['Approved'].astype(int)
-df['Var1'] = df['Var1'].astype(int)
+df_dummy = df.copy()
+df_dummy = pd.get_dummies(df,drop_first=True)
+df_dummy.head()
+# df['Gender'] = df['Gender'].map({'Female': 0, 'Male': 1})
+# df['Approved'] = df['Approved'].astype(int)
+# df['Var1'] = df['Var1'].astype(int)
 
-X_0 = df.drop('Approved', axis=1)
-y_0 = df['Approved']
+X_0 = df_dummy.drop('Approved', axis=1)
+y_0 = df_dummy['Approved']
 
 model_0 = sm.Logit(y_0, sm.add_constant(X_0)).fit()
 print(model_0.summary())
+# Pseudo R-squared 0.1200
+# insignificant variable: 
+# Monthly_Income,Loan_Amount,Loan_Period,EMI,age,lead_years,Employer_Category1,Primary_Bank_Type,
 
 # logistic regression for the whole dataframe (use balanced data)
 X = resampled_data.drop('Approved', axis=1)
 y = resampled_data['Approved']
 model_balanced = sm.Logit(y, sm.add_constant(X)).fit()
 print(model_balanced.summary())
+# Pseudo R-squared 0.4059
+# insignificant variable: lead_years, Gender
 
-# outputs of balanced model is relatively better than the model using the original data
+# Pseudo R-squared and log-likelihood are commonly used metrics for evaluating the performance of logistic regression models,
+# but they have their limitations and should be used in conjunction with other evaluation methods.
+# The model uses balanced data is better in the goodness of fit for prediction
 # usually drop insignificant coeffients (p-value > 0.05), but we may decide later
-# significant variable: Gender , Existing_EMI , Interest_Rate , Var1 
-
+  
 # Check variance inflation factor (VIF) for multicollinearity
 vif = [variance_inflation_factor(X, i) for i in range(X.shape[1])]
 vif_df = pd.DataFrame({'Variable': X.columns, 'VIF': vif})
@@ -493,12 +574,90 @@ print(vif_df.sort_values('VIF', ascending=False))
 # Note that a high VIF value (e.g., > 10) may indicate multicollinearity.
 
 #%%
-# This logistic model tries to drop all high VIF variables
+# Logistic model with feature selection
+
+# 86.4% male and 13.6% female before resampling
+print(df['Gender'].value_counts())
+# 85% male and 15% female after resampling
+print(resampled_data['Gender_Male'].value_counts())
+ 
+grouped = df.groupby(['Gender', 'Approved'])
+counts = grouped.size()
+table = counts.unstack()
+print(table)
+# 0.015 in female and 0.026 in male
+
+grouped = resampled_data.groupby(['Gender_Male', 'Approved'])
+counts = grouped.size()
+table = counts.unstack()
+print(table)
+# 0.544 in female and 0.492 in male
+# SMOTE generate balanced data but also erase the difference in approval rate by gender
+# We should keep gender
+
+bin=df.groupby(['lead_years'])['Approved'].mean()
+bin=bin.reset_index()
+plt.bar(bin.lead_years, bin.Approved)
+plt.title('Approval Rate by Lead Years')
+plt.xlabel('Lead Years')
+plt.ylabel('Approval Rate')
+plt.show()
+# it is just a date on which Lead was created, we should drop
+
+# For those insignificant variable in orginal data but significant in balanced data:
+# We can drop some based on plots of mean approval rate
+
+# histogram of age and approval is normally distributed,
+bin=df.groupby(['age'])['Approved'].mean()
+bin=bin.reset_index()
+plt.bar(bin.age, bin.Approved)
+plt.title('Approval Rate by Age')
+plt.xlabel('Age')
+plt.ylabel('Approval Rate')
+plt.show()
+# cant find a trend, drop age
+
+# Loan_Period
+bin=df.groupby(['Loan_Period'])['Approved'].mean()
+bin=bin.reset_index()
+plt.bar(bin.Loan_Period, bin.Approved)
+plt.title('Approval Rate by Loan_Period')
+plt.xlabel('Loan_Period')
+plt.ylabel('Approval Rate')
+plt.show()
+# drop loan Period
+
+# Some plots in previous sections
+# Drop Monthly_Income, EMI
+# Keep Loan_Amount 
+
+# Employer_Category1
+bin=df.groupby(['Employer_Category1'])['Approved'].mean()
+bin=bin.reset_index()
+plt.bar(bin.Employer_Category1, bin.Approved)
+plt.title('Approval Rate by Employer_Category1')
+plt.xlabel('Employer_Category1')
+plt.ylabel('Approval Rate')
+plt.show()
+# Keep
+
+# Primary_Bank_Type
+bin=df.groupby(['Primary_Bank_Type'])['Approved'].mean()
+bin=bin.reset_index()
+plt.bar(bin.Primary_Bank_Type, bin.Approved)
+plt.title('Approval Rate by Primary_Bank_Type')
+plt.xlabel('Primary_Bank_Type')
+plt.ylabel('Approval Rate')
+plt.show()
+# Keep
+
+# Selected model with balanced data
 y_1 = resampled_data['Approved']
-X_1 = resampled_data[['Gender','Var1','Monthly_Income','lead_years','Existing_EMI','Bank_Type_Combined','City_Combined','Employer_Combined','Source_Combined']]
+X_1 = resampled_data.drop(['Approved','Monthly_Income', 'Loan_Period','EMI','age','lead_years'], axis=1)
+
 model_1 = sm.Logit(y_1, sm.add_constant(X_1)).fit()
 print(model_1.summary())
-# significant variable: Gender , Var1 , Existing_EMI , Bank_Type_Combined , Employer_Combined
+# significant variable: Gender, but we know distribution changed because of SMOTE
 
 # Train the model and evaluate the performance
 X_train, X_test, y_train, y_test = train_test_split(X_1,y_1, test_size=0.2, random_state=42)
@@ -515,6 +674,15 @@ y_pred = lr.predict(X_test)
 # Evaluate the performance of the model using accuracy score and classification report
 print("Accuracy Score:", accuracy_score(y_test, y_pred))
 print("Classification Report:\n", classification_report(y_test, y_pred))
+
+# Create a confusion matrix
+from sklearn.metrics import confusion_matrix
+cm = pd.DataFrame(confusion_matrix(y_test, y_pred))
+cm['Total'] = np.sum(cm, axis=1)
+cm = cm.append(np.sum(cm, axis=0), ignore_index=True)
+cm.columns = ['Predicted No', 'Predicted Yes', 'Total']
+cm = cm.set_index([['Actual No', 'Actual Yes', 'Total']])
+print(cm)
 
 # ROC Curve
 
@@ -541,7 +709,23 @@ plt.show()
 
 # usually AUC > 0.8 indicates good fitted
 
+intercept = lr.intercept_
+coeff = lr.coef_
+coef_list = list(coeff[0,:])
+coef_df = pd.DataFrame({'Feature': list(X_train.columns),'Coefficient': coef_list})
+print(coef_df)
+
+feat_importances = coef_df #what we created before for coeff
+feat_importances['importances'] = np.abs(feat_importances['Coefficient']) #coeff is feature importance
+feat_importances.sort_values(by='importances', ascending=False, inplace=True)
+print(feat_importances) 
+# Var1 and Interest Rate contribute more
+
+# Conclusion
+
+
 #%%
+# Unused Models
 
 # Split the data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(df[['Monthly_Income', 'Loan_Amount', 'Loan_Period', 'Interest_Rate']], df['Approved'], test_size=0.2, random_state=42)
@@ -560,7 +744,6 @@ print("Accuracy Score:", accuracy_score(y_test, y_pred))
 print("Classification Report:\n", classification_report(y_test, y_pred))
 # An accuracy score of 0.974 in a logistic regression model may indicate overfitting
 
-# %%
 # KNN model
 
 # Split data into training and test sets
