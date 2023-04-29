@@ -373,20 +373,6 @@ plt.show()
 # sns.pairplot(df[['Monthly_Income', 'Loan_Amount', 'Loan_Period', 'Interest_Rate', 'Gender']], hue='Gender')
 # plt.show()
 
-# Scatterplot for monthly income and interest rate
-sns.scatterplot(data=df, x='Monthly_Income', y='Interest_Rate')
-plt.xlabel('Monthly Income')
-plt.ylabel('Interest Rate')
-plt.title('Scatterplot of Monthly Income and Interest Rate')
-plt.show()
-
-# Scatterplot for loan amount and interest rate
-sns.scatterplot(data=df, x='Loan_Amount', y='Interest_Rate')
-plt.xlabel('Loan Amount')
-plt.ylabel('Interest Rate')
-plt.title('Scatterplot of Loan Amount and Interest Rate')
-plt.show()
-
 # Scatterplot for loan period and interest rate
 sns.scatterplot(data=df, x='Interest_Rate', y='Loan_Period')
 plt.xlabel('Loan Period')
@@ -504,9 +490,6 @@ print("RMSE: %0.2f (+/- %0.2f)" % (np.mean(rmse_scores), np.std(rmse_scores) * 2
 # build a full model without feature selection
 # logistic regression for the whole dataframe (use original data)
 
-df_dummy = df.copy()
-df_dummy = pd.get_dummies(df,drop_first=True)
-df_dummy.head()
 # df['Gender'] = df['Gender'].map({'Female': 0, 'Male': 1})
 # df['Approved'] = df['Approved'].astype(int)
 # df['Var1'] = df['Var1'].astype(int)
@@ -617,15 +600,54 @@ plt.ylabel('Approval Rate')
 plt.show()
 # Keep
 
+# Selected model with original data
+y_0 = df_dummy['Approved']
+X_0 = df_dummy.drop(['Approved','Monthly_Income', 'Loan_Period','EMI','age','lead_years'], axis=1)
+
+model_0 = sm.Logit(y_0, sm.add_constant(X_0)).fit()
+print(model_0.summary())
+# insignificant variable: Loan_Amount , Primary_Bank_Type_P
+# drop insiginificant
+X_0 = df_dummy.drop(['Approved','Monthly_Income', 'Loan_Period','EMI','age','lead_years','Loan_Amount','Primary_Bank_Type_P'], axis=1)
+model_0 = sm.Logit(y_0, sm.add_constant(X_0)).fit()
+print(model_0.summary())
+
 # Selected model with balanced data
 y_1 = resampled_data['Approved']
-X_1 = resampled_data.drop(['Approved','Monthly_Income', 'Loan_Period','EMI','age','lead_years'], axis=1)
+X_1 = resampled_data.drop(['Approved','Gender_Male','lead_years'], axis=1)
 
 model_1 = sm.Logit(y_1, sm.add_constant(X_1)).fit()
 print(model_1.summary())
-# significant variable: Gender, but we know distribution changed because of SMOTE
+# no insignificant variable, but we know bias exist, eg., in female because of SMOTE
 
-# Train the model and evaluate the performance
+# Train both and evaluate 
+
+# Train imbalanced model and evaluate the performance
+X_train, X_test, y_train, y_test = train_test_split(X_0,y_0, test_size=0.2, random_state=42)
+
+# Define the logistic regression model
+lr = LogisticRegression()
+
+# Fit the model on the training set
+lr.fit(X_train, y_train)
+
+# Use the model to make predictions on the testing set
+y_pred = lr.predict(X_test)
+
+# Evaluate the performance of the model using accuracy score and classification report
+print("Accuracy Score:", accuracy_score(y_test, y_pred))
+print("Classification Report:\n", classification_report(y_test, y_pred))
+
+# Create a confusion matrix
+from sklearn.metrics import confusion_matrix
+cm = pd.DataFrame(confusion_matrix(y_test, y_pred))
+cm['Total'] = np.sum(cm, axis=1)
+cm = cm.append(np.sum(cm, axis=0), ignore_index=True)
+cm.columns = ['Predicted No', 'Predicted Yes', 'Total']
+cm = cm.set_index([['Actual No', 'Actual Yes', 'Total']])
+print(cm)
+
+# Train  balanced model and evaluate the performance
 X_train, X_test, y_train, y_test = train_test_split(X_1,y_1, test_size=0.2, random_state=42)
 
 # Define the logistic regression model
