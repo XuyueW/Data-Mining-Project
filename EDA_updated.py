@@ -361,40 +361,6 @@ plt.title('Loan Approval by Gender')
 plt.legend(title='Approved', labels=['No', 'Yes'])
 plt.show()
 
-# Interest_Rate vs Existing_EMI
-interest_rate = df["Interest_Rate"]
-existing_emi = df["Existing_EMI"]
-plt.scatter(interest_rate, existing_emi)
-plt.xlabel("Interest Rate")
-plt.ylabel("Existing EMI")
-plt.title("Relationship between Interest Rate and Existing EMI")
-plt.show()
-
-# Monthly Income, Existing EMI, and Loan Amount
-sns.scatterplot(x='Monthly_Income', y='Existing_EMI', size='Loan_Amount', data=df)
-# add labels and title
-plt.xlabel('Monthly Income')
-plt.ylabel('Existing EMI')
-plt.title('Relationship between Monthly Income, Existing EMI, and Loan Amount')
-
-# Loan Amount vs. Age and Gender
-approved_df = df[df['Approved'] == 1]
-sns.stripplot(x="age", y="Loan_Amount", hue="Gender", data=df, dodge=True)
-plt.xlabel("Age")
-plt.ylabel("Loan Amount")
-plt.title("Loan Amount vs. Age and Gender")
-plt.show()
-
-# Loan Amount by Age Group and Gender
-bins = [18, 30, 40, 50, 60, 70, 80, 90]
-labels = ['18-30', '30-40', '40-50', '50-60', '60-70', '70-80', '80-90']
-df['age_group'] = pd.cut(df['age'], bins=bins, labels=labels)
-sns.stripplot(x='age_group', y='Loan_Amount', hue='Gender', data=df)
-plt.xlabel('Age Group')
-plt.ylabel('Loan Amount')
-plt.title('Loan Amount by Age Group and Gender')
-plt.show() 
-
 # Use Seaborn to plot the correlation matrix between numerical variables
 # sns.heatmap(df[['Monthly_Income', 'Loan_Amount', 'Loan_Period', 'Interest_Rate']].corr(), annot=True, cmap='coolwarm')
 # plt.show()
